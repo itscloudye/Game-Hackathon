@@ -10,7 +10,7 @@
   <style>
     * {
       box-sizing: border-box;
-      border-radius: 0px !important;
+      border-radius: 0px !important; /* بدون أي كورنر نهائياً */
       margin: 0;
       padding: 0;
     }
@@ -37,6 +37,7 @@
       line-height: 1.4;
     }
 
+    /* حاوية تحاكي بوست ريديت */
     .reddit-post-container {
       width: 100%;
       max-width: 680px;
@@ -44,6 +45,7 @@
       border: 1px solid var(--border-strong);
     }
 
+    /* هيدر الصب ريديت */
     .post-header {
       display: flex;
       justify-content: space-between;
@@ -81,6 +83,7 @@
       color: var(--text-muted);
     }
 
+    /* شريط الستريك والتايمر */
     .streak-banner {
       display: flex;
       align-items: center;
@@ -103,6 +106,7 @@
       color: var(--reddit-orange);
     }
 
+    /* عنوان التحدي */
     .post-title-area {
       padding: 12px 14px 8px 14px;
     }
@@ -133,6 +137,7 @@
       margin-top: 4px;
     }
 
+    /* شريط الأشياء المطلوبة (5 أشياء) */
     .checklist-bar {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -176,6 +181,7 @@
       color: var(--text-muted);
     }
 
+    /* منطقة اللعب التفاعلية */
     .canvas-wrapper {
       position: relative;
       width: 100%;
@@ -191,6 +197,7 @@
       background: #FFFFFF;
     }
 
+    /* علامة الاكتشاف (دائرة/مربع تحديد حاد بدون كورنر) */
     .found-marker {
       position: absolute;
       width: 34px;
@@ -223,6 +230,7 @@
       100% { opacity: 0; transform: translate(-50%, -140%); }
     }
 
+    /* شاشة الفوز ومشاركة النتيجة */
     .win-overlay {
       display: none;
       position: absolute;
@@ -296,6 +304,7 @@
       background: #E03D00;
     }
 
+    /* شريط أزرار ريديت السفلي (Upvote / Comments / Share) */
     .post-footer {
       display: flex;
       justify-content: space-between;
@@ -308,4 +317,403 @@
       color: var(--text-muted);
     }
 
-    .
+    .action-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .footer-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .footer-pill:hover {
+      border-color: var(--border-strong);
+    }
+
+    .upvote-btn.active {
+      color: var(--reddit-orange);
+      border-color: var(--reddit-orange);
+      background: #FFF5F2;
+    }
+
+    .hint-btn {
+      background: #FFFFFF;
+      border: 1px solid var(--border-strong);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .hint-btn:hover {
+      background: var(--bg-subtle);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="reddit-post-container">
+    <!-- الهيدر -->
+    <div class="post-header">
+      <div class="subreddit-info">
+        <span class="sub-icon">r/</span>
+        <span class="sub-name">r/DailySpot</span>
+        <span class="post-meta">• Posted by u/devvit_bot • Puzzle #142</span>
+      </div>
+      <div class="streak-banner">
+        <span id="timerDisplay">00.0s</span>
+        <div class="streak-badge" title="Daily Streak">
+          <span class="streak-fire">▲</span>
+          <span id="streakCount">1</span> DAY STREAK
+        </div>
+      </div>
+    </div>
+
+    <!-- عنوان المنشور -->
+    <div class="post-title-area">
+      <span class="flair-tag">Daily Challenge</span>
+      <h1 class="post-title">Find the 5 hidden objects in this messy dev desk</h1>
+      <p class="post-subtitle">Click directly on each item. Built with raw lines — zero rounded corners.</p>
+    </div>
+
+    <!-- قائمة الـ 5 أشياء المطلوب إيجادها -->
+    <div class="checklist-bar" id="checklistBar"></div>
+
+    <!-- مساحة الرسمة والتفاعل -->
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <!-- رسمة فيكتور نظيفة بالأسود والأبيض تشبه رسومات ريديت اليدوية -->
+      <svg id="gameScene" viewBox="0 0 680 380" xmlns="http://www.w3.org/2000/svg">
+        <!-- خلفية الغرفة والمكتب -->
+        <rect x="0" y="0" width="680" height="380" fill="#FFFFFF"/>
+        <!-- خط الطاولة -->
+        <line x1="0" y1="290" x2="680" y2="290" stroke="#1A1A1B" stroke-width="2.5"/>
+        <line x1="0" y1="302" x2="680" y2="302" stroke="#1A1A1B" stroke-width="1"/>
+
+        <!-- نافذة في الخلفية -->
+        <rect x="40" y="30" width="130" height="150" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2"/>
+        <line x1="105" y1="30" x2="105" y2="180" stroke="#1A1A1B" stroke-width="1.5"/>
+        <line x1="40" y1="105" x2="170" y2="105" stroke="#1A1A1B" stroke-width="1.5"/>
+        <!-- خطوط سحاب بسيطة -->
+        <polyline points="55,70 75,70 75,60 95,60 95,70" fill="none" stroke="#787C7E" stroke-width="1.5"/>
+
+        <!-- رف كتب علوي -->
+        <rect x="450" y="65" width="190" height="8" fill="#1A1A1B"/>
+        <!-- كتب على الرف -->
+        <rect x="465" y="20" width="16" height="45" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.5"/>
+        <rect x="481" y="26" width="14" height="39" fill="#F6F7F8" stroke="#1A1A1B" stroke-width="1.5"/>
+        <rect x="495" y="18" width="18" height="47" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.5"/>
+        <polygon points="513,65 527,65 538,24 524,24" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.5"/>
+
+        <!-- شاشة الكمبيوتر الرئيسية -->
+        <rect x="235" y="95" width="210" height="135" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2.5"/>
+        <rect x="245" y="105" width="190" height="110" fill="#F6F7F8" stroke="#1A1A1B" stroke-width="1.5"/>
+        <!-- قاعدة الشاشة -->
+        <rect x="325" y="230" width="30" height="45" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2"/>
+        <rect x="295" y="275" width="90" height="15" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2"/>
+
+        <!-- كود داخل الشاشة -->
+        <line x1="258" y1="122" x2="310" y2="122" stroke="#1A1A1B" stroke-width="2"/>
+        <line x1="268" y1="135" x2="365" y2="135" stroke="#787C7E" stroke-width="2"/>
+        <line x1="268" y1="148" x2="340" y2="148" stroke="#787C7E" stroke-width="2"/>
+        <line x1="258" y1="161" x2="295" y2="161" stroke="#FF4500" stroke-width="2"/>
+        <line x1="268" y1="174" x2="395" y2="174" stroke="#787C7E" stroke-width="2"/>
+
+        <!-- كيبورد وماوس -->
+        <polygon points="240,315 430,315 445,342 225,342" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2"/>
+        <line x1="245" y1="324" x2="425" y2="324" stroke="#1A1A1B" stroke-width="1"/>
+        <line x1="240" y1="333" x2="430" y2="333" stroke="#1A1A1B" stroke-width="1"/>
+        <rect x="465" y="318" width="24" height="34" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2"/>
+        <line x1="477" y1="318" x2="477" y2="330" stroke="#1A1A1B" stroke-width="1.5"/>
+
+        <!-- نبتة مكتب على اليسار -->
+        <polygon points="75,290 115,290 108,245 82,245" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="2"/>
+        <polyline points="95,245 95,205 80,190" fill="none" stroke="#1A1A1B" stroke-width="2"/>
+        <polyline points="95,225 115,205 125,210" fill="none" stroke="#1A1A1B" stroke-width="2"/>
+        <polyline points="95,235 72,220 65,225" fill="none" stroke="#1A1A1B" stroke-width="2"/>
+
+        <!-- كومة أوراق وملاحظات على اليمين -->
+        <rect x="520" y="255" width="95" height="35" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.5"/>
+        <line x1="520" y1="265" x2="615" y2="265" stroke="#1A1A1B" stroke-width="1"/>
+        <line x1="520" y1="275" x2="615" y2="275" stroke="#1A1A1B" stroke-width="1"/>
+        <rect x="180" y="120" width="38" height="38" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.5"/>
+        <line x1="186" y1="132" x2="210" y2="132" stroke="#1A1A1B" stroke-width="1.5"/>
+
+        <!-- ========================================== -->
+        <!-- الأشياء الـ 5 المخفية (قابلة للضغط عليها) -->
+        <!-- ========================================== -->
+
+        <!-- 1. مشبك ورق (Paperclip) مخفي على رف الكتب -->
+        <g id="item-paperclip" class="hidden-target" data-id="paperclip" style="cursor: crosshair;">
+          <rect x="565" y="45" width="26" height="24" fill="transparent"/>
+          <path d="M572,64 L572,51 L582,51 L582,62 L575,62 L575,54" fill="none" stroke="#1A1A1B" stroke-width="1.6"/>
+        </g>
+
+        <!-- 2. شريحة بيتزا صغيرة (Pizza Slice) مخفية خلف أوراق اليمين -->
+        <g id="item-pizza" class="hidden-target" data-id="pizza" style="cursor: crosshair;">
+          <polygon points="602,255 628,255 615,232" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.6"/>
+          <line x1="604" y1="251" x2="626" y2="251" stroke="#1A1A1B" stroke-width="1.5"/>
+          <rect x="613" y="242" width="3" height="3" fill="#FF4500"/>
+        </g>
+
+        <!-- 3. مفتاح صغير (Key) معلق أسفل الشاشة -->
+        <g id="item-key" class="hidden-target" data-id="key" style="cursor: crosshair;">
+          <rect x="242" y="228" width="28" height="22" fill="transparent"/>
+          <rect x="246" y="233" width="8" height="8" fill="none" stroke="#1A1A1B" stroke-width="1.6"/>
+          <line x1="254" y1="237" x2="266" y2="237" stroke="#1A1A1B" stroke-width="1.6"/>
+          <line x1="262" y1="237" x2="262" y2="242" stroke="#1A1A1B" stroke-width="1.6"/>
+          <line x1="266" y1="237" x2="266" y2="242" stroke="#1A1A1B" stroke-width="1.6"/>
+        </g>
+
+        <!-- 4. بطة مطاطية هندسية (Rubber Duck) داخل أصيص النبتة -->
+        <g id="item-duck" class="hidden-target" data-id="duck" style="cursor: crosshair;">
+          <rect x="112" y="266" width="26" height="24" fill="transparent"/>
+          <polygon points="116,288 134,288 134,279 128,279 128,272 120,272 120,279 116,279" fill="#FFFFFF" stroke="#1A1A1B" stroke-width="1.6"/>
+          <polygon points="128,274 134,274 134,277 128,277" fill="#FF4500"/>
+        </g>
+
+        <!-- 5. هوائي ريديت (Snoo Antenna) مرسوم داخل شاشة الكود -->
+        <g id="item-snoo" class="hidden-target" data-id="snoo" style="cursor: crosshair;">
+          <rect x="392" y="114" width="32" height="32" fill="transparent"/>
+          <polyline points="402,138 406,124 416,126" fill="none" stroke="#1A1A1B" stroke-width="1.6"/>
+          <rect x="415" y="123" width="5" height="5" fill="#FF4500" stroke="#1A1A1B" stroke-width="1"/>
+        </g>
+      </svg>
+
+      <!-- شاشة الفوز ومشاركة النتيجة -->
+      <div class="win-overlay" id="winOverlay">
+        <div class="win-title">All 5 objects spotted!</div>
+        <div class="win-stats" id="finalStatsText">Time: 12.4s • Streak: 2 Days</div>
+        <div class="share-preview" id="shareBox"></div>
+        <div class="btn-row">
+          <button class="reddit-btn primary" id="copyResultBtn">Copy Result for Comments</button>
+          <button class="reddit-btn" id="replayBtn">Play Again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- الفوتر بأسلوب ريديت -->
+    <div class="post-footer">
+      <div class="action-group">
+        <button class="footer-pill upvote-btn" id="upvoteBtn">▲ <span id="upvoteCount">428</span></button>
+        <div class="footer-pill">💬 64 Comments</div>
+        <div class="footer-pill" id="foundCounterPill">0 / 5 Found</div>
+      </div>
+      <button class="hint-btn" id="hintBtn">Need a Hint?</button>
+    </div>
+  </div>
+
+  <script>
+    // تعريف الأشياء الـ 5 المخفية
+    const ITEMS = [
+      { id: 'paperclip', label: 'Paperclip', x: 578, y: 57 },
+      { id: 'pizza', label: 'Pizza Slice', x: 615, y: 246 },
+      { id: 'key', label: 'Small Key', x: 256, y: 237 },
+      { id: 'duck', label: 'Pixel Duck', x: 125, y: 280 },
+      { id: 'snoo', label: 'Antenna', x: 408, y: 129 }
+    ];
+
+    let foundIds = new Set();
+    let startTime = Date.now();
+    let timerInterval = null;
+    let gameCompleted = false;
+    let hintsUsed = 0;
+
+    // إدارة الستريك عبر LocalStorage
+    function loadStreak() {
+      const saved = localStorage.getItem('reddit_spot_streak');
+      let streak = saved ? parseInt(saved, 10) : 1;
+      document.getElementById('streakCount').textContent = streak;
+      return streak;
+    }
+
+    function incrementStreak() {
+      const today = new Date().toDateString();
+      const lastPlayed = localStorage.getItem('reddit_spot_last_day');
+      let streak = loadStreak();
+
+      if (lastPlayed !== today) {
+        streak += 1;
+        localStorage.setItem('reddit_spot_streak', streak);
+        localStorage.setItem('reddit_spot_last_day', today);
+      }
+      document.getElementById('streakCount').textContent = streak;
+      return streak;
+    }
+
+    // مؤثرات صوتية خفيفة بدون ملفات خارجية (Web Audio API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, duration = 0.08) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // بناء شريط العناصر المطلوبة
+    function renderChecklist() {
+      const bar = document.getElementById('checklistBar');
+      bar.innerHTML = '';
+      ITEMS.forEach(item => {
+        const isFound = foundIds.has(item.id);
+        const div = document.createElement('div');
+        div.className = `target-item ${isFound ? 'found' : ''}`;
+        div.innerHTML = `
+          <span>${item.label}</span>
+          <span class="target-status">${isFound ? '[FOUND]' : '[HIDDEN]'}</span>
+        `;
+        bar.appendChild(div);
+      });
+      document.getElementById('foundCounterPill').textContent = `${foundIds.size} / 5 Found`;
+    }
+
+    // بدء العداد الزمني
+    function startTimer() {
+      startTime = Date.now();
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!gameCompleted) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          document.getElementById('timerDisplay').textContent = `${elapsed}s`;
+        }
+      }, 100);
+    }
+
+    // وضع علامة على العنصر المكتشف
+    function markItemFound(item) {
+      if (foundIds.has(item.id) || gameCompleted) return;
+      foundIds.add(item.id);
+      playTone(620, 0.09);
+
+      const wrapper = document.getElementById('canvasWrapper');
+      const marker = document.createElement('div');
+      marker.className = 'found-marker';
+      marker.style.left = `${(item.x / 680) * 100}%`;
+      marker.style.top = `${(item.y / 380) * 100}%`;
+      wrapper.appendChild(marker);
+
+      renderChecklist();
+
+      if (foundIds.size === ITEMS.length) {
+        finishGame();
+      }
+    }
+
+    // إنهاء اللعبة وعرض بطاقة النتيجة
+    function finishGame() {
+      gameCompleted = true;
+      clearInterval(timerInterval);
+      playTone(880, 0.18);
+
+      const finalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+      const streak = incrementStreak();
+
+      document.getElementById('finalStatsText').textContent =
+        `Time: ${finalTime}s • Streak: ${streak} Days • Hints: ${hintsUsed}`;
+
+      const shareText =
+        `r/DailySpot #142\n` +
+        `🟧🟧🟧🟧🟧 (5/5 found)\n` +
+        `⏱️ Time: ${finalTime}s | ▲ Streak: ${streak}d`;
+
+      document.getElementById('shareBox').textContent = shareText;
+      document.getElementById('winOverlay').classList.add('active');
+    }
+
+    // ربط الأحداث بالعناصر المخفية
+    document.querySelectorAll('.hidden-target').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = el.getAttribute('data-id');
+        const item = ITEMS.find(i => i.id === id);
+        if (item) markItemFound(item);
+      });
+    });
+
+    // عند الضغط في مكان خاطئ
+    document.getElementById('gameScene').addEventListener('click', (e) => {
+      if (gameCompleted) return;
+      playTone(180, 0.06);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+      const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+
+      const miss = document.createElement('div');
+      miss.className = 'miss-marker';
+      miss.textContent = '×';
+      miss.style.left = `${xPct}%`;
+      miss.style.top = `${yPct}%`;
+      document.getElementById('canvasWrapper').appendChild(miss);
+      setTimeout(() => miss.remove(), 500);
+    });
+
+    // زر التلميح (Hint)
+    document.getElementById('hintBtn').addEventListener('click', () => {
+      if (gameCompleted) return;
+      const remaining = ITEMS.filter(i => !foundIds.has(i.id));
+      if (remaining.length === 0) return;
+      hintsUsed++;
+      const target = remaining[0];
+      const wrapper = document.getElementById('canvasWrapper');
+      const pulse = document.createElement('div');
+      pulse.className = 'found-marker';
+      pulse.style.borderColor = '#0079D3';
+      pulse.style.width = '56px';
+      pulse.style.height = '56px';
+      pulse.style.left = `${(target.x / 680) * 100}%`;
+      pulse.style.top = `${(target.y / 380) * 100}%`;
+      wrapper.appendChild(pulse);
+      setTimeout(() => pulse.remove(), 900);
+    });
+
+    // زر نسخ النتيجة للتعليقات
+    document.getElementById('copyResultBtn').addEventListener('click', () => {
+      const text = document.getElementById('shareBox').textContent;
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copyResultBtn');
+      btn.textContent = 'Copied to Clipboard!';
+      setTimeout(() => btn.textContent = 'Copy Result for Comments', 2000);
+    });
+
+    // زر إعادة اللعب
+    document.getElementById('replayBtn').addEventListener('click', () => {
+      foundIds.clear();
+      hintsUsed = 0;
+      gameCompleted = false;
+      document.querySelectorAll('.found-marker').forEach(m => m.remove());
+      document.getElementById('winOverlay').classList.remove('active');
+      renderChecklist();
+      startTimer();
+    });
+
+    // زر Upvote التفاعلي
+    document.getElementById('upvoteBtn').addEventListener('click', function () {
+      this.classList.toggle('active');
+      const countEl = document.getElementById('upvoteCount');
+      let count = parseInt(countEl.textContent, 10);
+      countEl.textContent = this.classList.contains('active') ? count + 1 : count - 1;
+    });
+
+    // تشغيل اللعبة عند التحميل
+    loadStreak();
+    renderChecklist();
+    startTimer();
+  </script>
+</body>
+</html>
