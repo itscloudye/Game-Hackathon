@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triple Pile - 5-Slot Layered Match-3</title>
+    <!-- Load Inter modern geometric font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #1e1b4b 0%, #090d16 100%);
+            min-height: 100vh;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 3D layered pile tile styling */
+        .pile-tile {
+            position: absolute;
+            width: 58px;
+            height: 64px;
+            border-radius: 14px;
+            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease, box-shadow 0.22s ease;
+            will-change: transform, filter;
+        }
+
+        @media (min-width: 640px) {
+            .pile-tile {
+                width: 66px;
+                height: 72px;
+                border-radius: 16px;
+            }
+        }
+
+        /* Unblocked (clickable) tile */
+        .pile-tile.unblocked {
+            cursor: pointer;
+            filter: brightness(1.06);
+            box-shadow:
+                0 6px 0 #0f172a,
+                0 10px 18px rgba(0, 0, 0, 0.65),
+                inset 0 1px 1px rgba(255, 255, 255, 0.28);
+        }
+
+        .pile-tile.unblocked:hover {
+            transform: translateY(-6px) scale(1.07) !important;
+            box-shadow:
+                0 11px 0 #1e293b,
+                0 18px 28px rgba(99, 102, 241, 0.45),
+                inset 0 1px 2px rgba(255, 255, 255, 0.45);
+            z-index: 999 !important;
+        }
+
+        .pile-tile.unblocked:active {
+            transform: translateY(1px) scale(0.96) !important;
+            box-shadow: 0 3px 0 #0f172a;
+        }
+
+        /* Blocked (covered) tile */
+        .pile-tile.blocked {
+            cursor: not-allowed;
+            filter: brightness(0.46) saturate(0.75);
+            box-shadow:
+                0 4px 0 #020617,
+                0 6px 12px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Shake animation when clicking a covered tile */
+        @keyframes blockedShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-3deg); }
+            75% { transform: translateX(5px) rotate(3deg); }
+        }
+
+        .tile-shake {
+            animation: blockedShake 0.28s ease-in-out;
+        }
+
+        /* Slot item entrance animation */
+        @keyframes popIn {
+            0% { transform: scale(0.3) translateY(-24px); opacity: 0; }
+            70% { transform: scale(1.12); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .slot-item-enter {
+            animation: popIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        /* Triple match burst explosion animation */
+        @keyframes matchBurst {
+            0% { transform: scale(1); filter: brightness(1); }
+            40% { transform: scale(1.25) rotate(6deg); filter: brightness(1.8); box-shadow: 0 0 25px #10b981; }
+            100% { transform: scale(0) rotate(-12deg); opacity: 0; }
+        }
+
+        .slot-item-match {
+            animation: matchBurst 0.42s ease-in-out forwards;
+            border-color: #10b981 !important;
+            background: rgba(16, 185, 129, 0.28) !important;
+        }
+
+        /* Dock warning shake when 4/5 slots are full */
+        @keyframes shakeWarning {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        .bar-warning {
+            animation: shakeWarning 0.35s ease-in-out;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 22px rgba(239, 68, 68, 0.45);
+        }
+
+        /* Celebration particles */
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            border-radius: 50%;
+            z-index: 9999;
+            animation: particleFly 0.7s ease-out forwards;
+        }
+
+        @keyframes particleFly {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-100 flex flex-col items-center justify-between p-2.5 sm:p-5 overflow-x-hidden">
+
+    <!-- Header & Stats Dashboard -->
+    <header class="w-full max-w-xl flex flex-col gap-2.5">
+        <div class="flex items-center justify-between bg-slate-900/85 backdrop-blur-md border border-slate-800 rounded-2xl px-3.5 py-2.5 shadow-xl">
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-xl shadow-inner">
+                    🧱
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-xl font-black bg-gradient-to-r from-indigo-400 via-cyan-300 to-emerald-300 bg-clip-text text-transparent">
+                        Triple Pile
+                    </h1>
+                    <p class="text-[11px] sm:text-xs text-slate-400">Pick free tiles from the stack & match 3 in the dock</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Difficulty Selector -->
+                <select id="difficultySelect" onchange="initGame()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold rounded-xl px-2.5 py-2 outline-none cursor-pointer transition">
+                    <option value="30">Easy (30)</option>
+                    <option value="36" selected>Medium (36)</option>
+                    <option value="45">Hard (45)</option>
+                </select>
+
+                <!-- Sound Toggle -->
+                <button id="soundToggleBtn" onclick="toggleSound()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition" title="Toggle Sound">
+                    <span id="soundIcon">🔊</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Score, Remaining & Best Score Cards -->
+        <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 shadow-md relative overflow-hidden">
+                <span class="block text-[11px] text-slate-400">Score</span>
+                <div class="flex items-center justify-center gap-1.5">
+                    <span id="scoreDisplay" class="text-lg sm:text-2xl font-black text-emerald-400">0</span>
+                    <span id="comboBadge" class="hidden text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">x2</span>
+                </div>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 shadow-md">
+                <span class="block text-[11px] text-slate-400">Tiles Left</span>
+                <span id="remainingDisplay" class="text-lg sm:text-2xl font-black text-cyan-400">36</span>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-2 shadow-md">
+                <span class="block text-[11px] text-slate-400">Best</span>
+                <span id="bestScoreDisplay" class="text-lg sm:text-2xl font-black text-amber-400">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Play Area (3D Layered Random Pile) -->
+    <main class="w-full max-w-xl my-2.5 flex-1 flex flex-col items-center justify-center">
+        <div id="boardContainer" class="w-full h-[360px] sm:h-[410px] bg-slate-900/55 backdrop-blur-sm border border-slate-800/90 rounded-3xl shadow-2xl relative overflow-hidden flex items-center justify-center">
+            <!-- Visual Legend -->
+            <div class="absolute top-2.5 left-3.5 text-[11px] text-slate-400/80 flex items-center gap-1.5 pointer-events-none z-0">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                <span>Lit = Free</span>
+                <span class="w-2 h-2 rounded-full bg-slate-600 inline-block ml-2"></span>
+                <span>Dimmed = Covered</span>
+            </div>
+
+            <!-- Layered Pile Stage -->
+            <div id="pileStage" class="relative w-full h-full">
+                <!-- Layered tiles are rendered here dynamically -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Section: 5-Slot Holding Dock & Power-ups -->
+    <footer class="w-full max-w-xl flex flex-col gap-2.5">
+        <!-- 5-Slot Holding Dock -->
+        <div class="flex flex-col items-center">
+            <div class="flex items-center justify-between w-full px-2 mb-1">
+                <span class="text-xs font-semibold text-slate-400">Holding Dock (Max 5 Slots)</span>
+                <span id="slotCounterText" class="text-xs font-bold text-indigo-400">0 / 5 Slots</span>
+            </div>
+
+            <div id="slotsWrapper" class="w-full bg-slate-950/90 border-2 border-indigo-500/40 rounded-3xl p-2.5 shadow-[0_0_30px_rgba(79,70,229,0.2)] transition-all">
+                <div id="slotsGrid" class="grid grid-cols-5 gap-2 sm:gap-3">
+                    <!-- 5 fixed slots -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Power-ups & Action Buttons -->
+        <div class="grid grid-cols-3 gap-2.5">
+            <button id="undoBtn" onclick="useUndo()" class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-700 font-bold text-xs sm:text-sm transition shadow-lg">
+                <span>↩️</span>
+                <span>Undo (<span id="undoCount">1</span>)</span>
+            </button>
+
+            <button id="shuffleBtn" onclick="useShuffle()" class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-700 font-bold text-xs sm:text-sm transition shadow-lg">
+                <span>🔀</span>
+                <span>Shuffle (<span id="shuffleCount">1</span>)</span>
+            </button>
+
+            <button onclick="initGame()" class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-400/30 font-bold text-xs sm:text-sm text-white transition shadow-lg">
+                <span>🔄</span>
+                <span>Restart</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- Win / Game Over Modal -->
+    <div id="resultModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl transform transition-all scale-100">
+            <div id="modalEmoji" class="text-6xl mb-3">🏆</div>
+            <h2 id="modalTitle" class="text-2xl font-black mb-2 text-white">Victory!</h2>
+            <p id="modalDesc" class="text-slate-400 text-sm mb-5">Sharp eyes! You cleared the entire layered pile.</p>
+
+            <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 mb-6 flex justify-around">
+                <div>
+                    <span class="block text-xs text-slate-400">Your Score</span>
+                    <span id="modalScore" class="text-xl font-black text-emerald-400">0</span>
+                </div>
+                <div class="w-px bg-slate-800"></div>
+                <div>
+                    <span class="block text-xs text-slate-400">Best Score</span>
+                    <span id="modalBestScore" class="text-xl font-black text-amber-400">0</span>
+                </div>
+            </div>
+
+            <button onclick="initGame()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-black text-base shadow-lg transition transform active:scale-95">
+                Play Again 🚀
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Tile element definitions (clean icon-only design with distinct color gradients)
+         */
+        const ELEMENT_TYPES = [
+            { id: 'shield',  icon: '🛡️', bg: 'from-blue-600 to-slate-900',    border: 'border-blue-400/70' },
+            { id: 'bolt',    icon: '⚡', bg: 'from-amber-500 to-slate-900',   border: 'border-amber-300/70' },
+            { id: 'gem',     icon: '💎', bg: 'from-cyan-500 to-slate-900',    border: 'border-cyan-300/70' },
+            { id: 'fire',    icon: '🔥', bg: 'from-rose-600 to-slate-900',    border: 'border-rose-400/70' },
+            { id: 'key',     icon: '🔑', bg: 'from-emerald-500 to-slate-900', border: 'border-emerald-300/70' },
+            { id: 'dna',     icon: '🧬', bg: 'from-purple-600 to-slate-900',  border: 'border-purple-400/70' },
+            { id: 'star',    icon: '🌟', bg: 'from-fuchsia-500 to-slate-900', border: 'border-fuchsia-300/70' },
+            { id: 'crown',   icon: '👑', bg: 'from-yellow-500 to-slate-900',  border: 'border-yellow-300/70' },
+            { id: 'rocket',  icon: '🚀', bg: 'from-indigo-500 to-slate-900',  border: 'border-indigo-300/70' },
+            { id: 'magnet',  icon: '🧲', bg: 'from-red-500 to-slate-900',    border: 'border-red-300/70' },
+            { id: 'crystal', icon: '🔮', bg: 'from-violet-600 to-slate-900',  border: 'border-violet-400/70' },
+            { id: 'compass', icon: '🧭', bg: 'from-teal-500 to-slate-900',    border: 'border-teal-300/70' },
+            { id: 'potion',  icon: '🧪', bg: 'from-lime-500 to-slate-900',    border: 'border-lime-300/70' },
+            { id: 'atom',    icon: '⚛️', bg: 'from-sky-500 to-slate-900',     border: 'border-sky-300/70' },
+            { id: 'target',  icon: '🎯', bg: 'from-orange-500 to-slate-900',  border: 'border-orange-300/70' }
+        ];
+
+        const MAX_SLOTS = 5;
+
+        // Game State
+        let pileTiles = [];        // Remaining tiles in layered stack { uid, type, x, y, z, rot, blocked }
+        let slotItems = [];        // Tiles currently inside the 5-slot dock
+        let score = 0;
+        let comboMultiplier = 1;
+        let bestScore = parseInt(localStorage.getItem('tripleLayerMatchBest') || '0', 10);
+        let undoRemaining = 1;
+        let shuffleRemaining = 1;
+        let lastMoveHistory = null;
+        let isAnimating = false;
+        let soundEnabled = true;
+
+        // Web Audio API Synthesizer
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTone(freq, type = 'sine', duration = 0.12, vol = 0.15) {
+            if (!soundEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        function playSoundEffect(effect) {
+            if (effect === 'pick') {
+                playTone(540, 'triangle', 0.08, 0.12);
+            } else if (effect === 'blocked') {
+                playTone(140, 'square', 0.1, 0.09);
+            } else if (effect === 'match') {
+                const base = 520 + (comboMultiplier * 60);
+                playTone(base, 'sine', 0.14, 0.18);
+                setTimeout(() => playTone(base * 1.35, 'sine', 0.24, 0.2), 85);
+            } else if (effect === 'win') {
+                [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+                    setTimeout(() => playTone(f, 'triangle', 0.25, 0.18), idx * 110);
+                });
+            } else if (effect === 'lose') {
+                playTone(220, 'sawtooth', 0.25, 0.15);
+                setTimeout(() => playTone(160, 'sawtooth', 0.35, 0.15), 160);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+        }
+
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        /**
+         * Recalculate occlusion:
+         * If any higher-layer tile (larger z) overlaps more than 20% of a lower tile's area,
+         * the lower tile is marked as blocked/covered.
+         */
+        function recalculateOcclusion() {
+            const isMobile = window.innerWidth < 640;
+            const tileW = isMobile ? 58 : 66;
+            const tileH = isMobile ? 64 : 72;
+            const tileArea = tileW * tileH;
+
+            for (let i = 0; i < pileTiles.length; i++) {
+                const current = pileTiles[i];
+                let isCovered = false;
+
+                for (let j = 0; j < pileTiles.length; j++) {
+                    if (i === j) continue;
+                    const other = pileTiles[j];
+
+                    if (other.z > current.z) {
+                        const overlapX = Math.max(0, Math.min(current.x + tileW, other.x + tileW) - Math.max(current.x, other.x));
+                        const overlapY = Math.max(0, Math.min(current.y + tileH, other.y + tileH) - Math.max(current.y, other.y));
+                        const overlapArea = overlapX * overlapY;
+
+                        if (overlapArea / tileArea > 0.20) {
+                            isCovered = true;
+                            break;
+                        }
+                    }
+                }
+                current.blocked = isCovered;
+            }
+        }
+
+        /**
+         * Generate 3D layered random positions across 4-5 layers so edges and icons peek out visually
+         */
+        function generateLayeredPositions(totalCount) {
+            const stage = document.getElementById('pileStage');
+            const stageW = stage.clientWidth || 340;
+            const stageH = stage.clientHeight || 360;
+
+            const isMobile = window.innerWidth < 640;
+            const tileW = isMobile ? 58 : 66;
+            const tileH = isMobile ? 64 : 72;
+
+            const padX = 18;
+            const padTop = 32;
+            const padBottom = 18;
+            const maxX = Math.max(padX + 10, stageW - tileW - padX);
+            const maxY = Math.max(padTop + 10, stageH - tileH - padBottom);
+
+            const layersCount = totalCount >= 45 ? 5 : 4;
+            const positions = [];
+
+            for (let i = 0; i < totalCount; i++) {
+                const layer = i % layersCount;
+                const centerBias = (layer / layersCount) * 0.28;
+
+                const rangeX = (maxX - padX) * (1 - centerBias);
+                const rangeY = (maxY - padTop) * (1 - centerBias);
+                const startX = padX + ((maxX - padX) - rangeX) / 2;
+                const startY = padTop + ((maxY - padTop) - rangeY) / 2;
+
+                let bestX = startX + Math.random() * rangeX;
+                let bestY = startY + Math.random() * rangeY;
+
+                // Ensure partial peeking offsets rather than exact coordinate stacking
+                for (let attempt = 0; attempt < 15; attempt++) {
+                    const candX = startX + Math.random() * rangeX;
+                    const candY = startY + Math.random() * rangeY;
+
+                    const tooExact = positions.some(p => Math.abs(p.x - candX) < 15 && Math.abs(p.y - candY) < 15);
+                    if (!tooExact) {
+                        bestX = candX;
+                        bestY = candY;
+                        break;
+                    }
+                }
+
+                positions.push({
+                    x: Math.round(bestX),
+                    y: Math.round(bestY),
+                    z: layer * 10 + i,
+                    rot: Math.round((Math.random() - 0.5) * 8)
+                });
+            }
+
+            return positions.sort((a, b) => a.z - b.z);
+        }
+
+        /**
+         * Initialize / Reset Game
+         */
+        function initGame() {
+            const modal = document.getElementById('resultModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            const totalTiles = parseInt(document.getElementById('difficultySelect').value, 10) || 36;
+            const triplesCount = totalTiles / 3;
+
+            const chosenTypes = shuffleArray(ELEMENT_TYPES).slice(0, triplesCount);
+            let rawTypesPool = [];
+            chosenTypes.forEach(type => {
+                rawTypesPool.push(type, type, type);
+            });
+            rawTypesPool = shuffleArray(rawTypesPool);
+
+            const positions = generateLayeredPositions(totalTiles);
+
+            pileTiles = positions.map((pos, idx) => ({
+                uid: idx + 1,
+                type: rawTypesPool[idx],
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+                rot: pos.rot,
+                blocked: false
+            }));
+
+            slotItems = [];
+            score = 0;
+            comboMultiplier = 1;
+            undoRemaining = 1;
+            shuffleRemaining = 1;
+            lastMoveHistory = null;
+            isAnimating = false;
+
+            document.getElementById('slotsWrapper').classList.remove('bar-warning');
+            recalculateOcclusion();
+            updateUI();
+        }
+
+        /**
+         * Render UI, Pile Tiles (icon-only), and 5-Slot Dock (icon-only)
+         */
+        function updateUI(newlyAddedUid = null, matchedTypeId = null) {
+            document.getElementById('scoreDisplay').textContent = score;
+            document.getElementById('bestScoreDisplay').textContent = bestScore;
+            document.getElementById('remainingDisplay').textContent = pileTiles.length;
+            document.getElementById('slotCounterText').textContent = `${slotItems.length} / ${MAX_SLOTS} Slots`;
+
+            const comboBadge = document.getElementById('comboBadge');
+            if (comboMultiplier > 1) {
+                comboBadge.textContent = `x${comboMultiplier}`;
+                comboBadge.classList.remove('hidden');
+            } else {
+                comboBadge.classList.add('hidden');
+            }
+
+            document.getElementById('undoCount').textContent = undoRemaining;
+            document.getElementById('shuffleCount').textContent = shuffleRemaining;
+            document.getElementById('undoBtn').disabled = (undoRemaining <= 0 || !lastMoveHistory || isAnimating);
+            document.getElementById('shuffleBtn').disabled = (shuffleRemaining <= 0 || pileTiles.length <= 1 || isAnimating);
+
+            // Render 3D Pile Tiles (Clean centered icon only, no text underneath)
+            const stageEl = document.getElementById('pileStage');
+            stageEl.innerHTML = '';
+
+            pileTiles.forEach(tile => {
+                const el = document.createElement('button');
+                const stateClass = tile.blocked ? 'blocked' : 'unblocked';
+
+                el.className = `pile-tile ${stateClass} bg-gradient-to-br ${tile.type.bg} border-2 ${tile.type.border} flex items-center justify-center select-none`;
+                el.style.left = `${tile.x}px`;
+                el.style.top = `${tile.y}px`;
+                el.style.zIndex = tile.z;
+                el.style.transform = `rotate(${tile.rot}deg)`;
+
+                el.onclick = (e) => handlePileTileClick(tile.uid, el, e);
+
+                el.innerHTML = `
+                    <span class="text-3xl sm:text-4xl drop-shadow-md pointer-events-none leading-none">${tile.type.icon}</span>
+                `;
+                stageEl.appendChild(el);
+            });
+
+            // Render 5-Slot Holding Dock (Clean centered icon only)
+            const slotsEl = document.getElementById('slotsGrid');
+            slotsEl.innerHTML = '';
+
+            for (let i = 0; i < MAX_SLOTS; i++) {
+                const slotBox = document.createElement('div');
+                const item = slotItems[i];
+
+                if (item) {
+                    const isNew = item.uid === newlyAddedUid;
+                    const isMatched = item.type.id === matchedTypeId;
+
+                    slotBox.className = `aspect-square rounded-2xl bg-gradient-to-br ${item.type.bg} border-2 ${item.type.border} flex items-center justify-center shadow-inner ${isNew ? 'slot-item-enter' : ''} ${isMatched ? 'slot-item-match' : ''}`;
+                    slotBox.innerHTML = `
+                        <span class="text-3xl sm:text-4xl drop-shadow leading-none">${item.type.icon}</span>
+                    `;
+                } else {
+                    slotBox.className = `aspect-square rounded-2xl bg-slate-900/60 border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-700 text-xs font-bold`;
+                    slotBox.textContent = i + 1;
+                }
+
+                slotsEl.appendChild(slotBox);
+            }
+        }
+
+        /**
+         * Handle Tile Selection from the Pile
+         */
+        function handlePileTileClick(uid, domEl, event) {
+            if (isAnimating || slotItems.length >= MAX_SLOTS) return;
+
+            const tileIndex = pileTiles.findIndex(t => t.uid === uid);
+            if (tileIndex === -1) return;
+
+            const selectedTile = pileTiles[tileIndex];
+
+            // Covered tiles shake and reject selection
+            if (selectedTile.blocked) {
+                playSoundEffect('blocked');
+                domEl.classList.remove('tile-shake');
+                void domEl.offsetWidth;
+                domEl.classList.add('tile-shake');
+                return;
+            }
+
+            // Save exact coordinates and state for Undo
+            lastMoveHistory = {
+                pileTiles: pileTiles.map(t => ({ ...t })),
+                slotItems: slotItems.map(s => ({ ...s })),
+                comboMultiplier
+            };
+
+            // Remove tile from pile & unlock newly exposed lower tiles
+            pileTiles.splice(tileIndex, 1);
+            recalculateOcclusion();
+            playSoundEffect('pick');
+
+            // Auto-group next to identical icons in the 5-slot dock
+            let insertIndex = slotItems.length;
+            for (let i = slotItems.length - 1; i >= 0; i--) {
+                if (slotItems[i].type.id === selectedTile.type.id) {
+                    insertIndex = i + 1;
+                    break;
+                }
+            }
+            slotItems.splice(insertIndex, 0, selectedTile);
+
+            // Check for Triple Match (3 identical icons)
+            const sameTypeCount = slotItems.filter(el => el.type.id === selectedTile.type.id).length;
+
+            if (sameTypeCount === 3) {
+                isAnimating = true;
+                lastMoveHistory = null;
+                updateUI(selectedTile.uid, selectedTile.type.id);
+                playSoundEffect('match');
+                spawnParticles(event.clientX, event.clientY);
+
+                setTimeout(() => {
+                    slotItems = slotItems.filter(el => el.type.id !== selectedTile.type.id);
+                    score += 150 * comboMultiplier;
+                    comboMultiplier = Math.min(comboMultiplier + 1, 5);
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        localStorage.setItem('tripleLayerMatchBest', bestScore.toString());
+                    }
+
+                    isAnimating = false;
+                    document.getElementById('slotsWrapper').classList.remove('bar-warning');
+                    updateUI();
+
+                    if (pileTiles.length === 0 && slotItems.length === 0) {
+                        triggerEndGame(true);
+                    }
+                }, 420);
+
+            } else {
+                comboMultiplier = 1;
+                updateUI(selectedTile.uid, null);
+
+                const wrapper = document.getElementById('slotsWrapper');
+                if (slotItems.length === 4) {
+                    wrapper.classList.add('bar-warning');
+                } else {
+                    wrapper.classList.remove('bar-warning');
+                }
+
+                // Game Over if all 5 slots fill up with no match
+                if (slotItems.length >= MAX_SLOTS) {
+                    isAnimating = true;
+                    setTimeout(() => {
+                        triggerEndGame(false);
+                    }, 430);
+                }
+            }
+        }
+
+        /**
+         * Undo Power-up: Restores tile back to its exact pile position & layer
+         */
+        function useUndo() {
+            if (undoRemaining <= 0 || !lastMoveHistory || isAnimating) return;
+            pileTiles = lastMoveHistory.pileTiles;
+            slotItems = lastMoveHistory.slotItems;
+            comboMultiplier = lastMoveHistory.comboMultiplier;
+            lastMoveHistory = null;
+            undoRemaining--;
+            document.getElementById('slotsWrapper').classList.remove('bar-warning');
+            recalculateOcclusion();
+            playTone(380, 'sine', 0.12, 0.12);
+            updateUI();
+        }
+
+        /**
+         * Shuffle Power-up: Redistributes icons across the remaining pile tiles
+         */
+        function useShuffle() {
+            if (shuffleRemaining <= 0 || pileTiles.length <= 1 || isAnimating) return;
+            const shuffledTypes = shuffleArray(pileTiles.map(t => t.type));
+            pileTiles.forEach((tile, idx) => {
+                tile.type = shuffledTypes[idx];
+            });
+            shuffleRemaining--;
+            playTone(620, 'triangle', 0.15, 0.12);
+            updateUI();
+        }
+
+        /**
+         * Display Win or Game Over Modal
+         */
+        function triggerEndGame(isWin) {
+            const modal = document.getElementById('resultModal');
+            const emoji = document.getElementById('modalEmoji');
+            const title = document.getElementById('modalTitle');
+            const desc = document.getElementById('modalDesc');
+
+            if (isWin) {
+                playSoundEffect('win');
+                emoji.textContent = '🏆';
+                title.textContent = 'Victory! Pile Cleared!';
+                title.className = 'text-2xl font-black mb-2 text-emerald-400';
+                desc.textContent = 'Sharp observation! You dismantled every layer without overflowing the dock.';
+            } else {
+                playSoundEffect('lose');
+                emoji.textContent = '💥';
+                title.textContent = 'Game Over!';
+                title.className = 'text-2xl font-black mb-2 text-rose-400';
+                desc.textContent = 'All 5 slots filled up without forming a triple match.';
+            }
+
+            document.getElementById('modalScore').textContent = score;
+            document.getElementById('modalBestScore').textContent = bestScore;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        /**
+         * Particle Burst Effect
+         */
+        function spawnParticles(x, y) {
+            const colors = ['#10b981', '#38bdf8', '#fbbf24', '#a855f7'];
+            for (let i = 0; i < 16; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 8 + 5;
+                p.style.width = `${size}px`;
+                p.style.height = `${size}px`;
+                p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                p.style.left = `${x || window.innerWidth / 2}px`;
+                p.style.top = `${y || window.innerHeight * 0.75}px`;
+
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 95 + 30;
+                p.style.setProperty('--tx', `${Math.cos(angle) * dist}px`);
+                p.style.setProperty('--ty', `${Math.sin(angle) * dist}px`);
+
+                document.body.appendChild(p);
+                setTimeout(() => p.remove(), 700);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            if (pileTiles.length > 0) {
+                recalculateOcclusion();
+                updateUI();
+            }
+        });
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
